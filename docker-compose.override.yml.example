@@ -1,0 +1,60 @@
+# Docker Compose Override Example
+# Copy this file to docker-compose.override.yml for development
+
+version: '3.8'
+
+services:
+  api:
+    volumes:
+      # Mount source code for live reload during development
+      - ./api:/app/api
+      - ./attck-mapper:/app/attck_mapper
+      - ./profiler:/app/profiler
+      - ./reports:/app/reports
+      - ./intel:/app/intel
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    ports:
+      # Expose debugger port
+      - "5678:5678"
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile.dev
+      target: development
+    volumes:
+      - ./dashboard/src:/app/src
+      - ./dashboard/public:/app/public
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:3000
+
+  ml-engine:
+    volumes:
+      - ./ml-engine:/app
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+
+  monitor:
+    volumes:
+      - ./monitor:/app
+    environment:
+      - DEBUG=true
+
+  # Development database for testing
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=shadowot
+      - POSTGRES_PASSWORD=dev_password
+      - POSTGRES_DB=shadowot_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_dev_data:
