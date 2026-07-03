@@ -1,0 +1,252 @@
+services:
+  plc-01:
+    build: ./plc-simulator
+    container_name: plc-01
+    environment:
+      - PLC_ID=PLC-01
+    networks:
+      scada-net:
+        ipv4_address: ${PLC_01_IP:-10.5.0.10}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    restart: unless-stopped
+
+  plc-02:
+    build: ./plc-simulator
+    container_name: plc-02
+    environment:
+      - PLC_ID=PLC-02
+    networks:
+      scada-net:
+        ipv4_address: ${PLC_02_IP:-10.5.0.11}
+    restart: unless-stopped
+
+  hmi:
+    build: ./hmi
+    container_name: hmi
+    ports:
+      # HMI Flask UI: host ${HMI_PORT} -> container 5000
+      - "${HMI_PORT:-5050}:5000"
+    environment:
+      - PLC_01_IP=${PLC_01_IP:-10.5.0.10}
+      - PLC_02_IP=${PLC_02_IP:-10.5.0.11}
+    networks:
+      scada-net:
+        ipv4_address: ${HMI_IP:-10.5.0.20}
+    depends_on:
+      - plc-01
+      - plc-02
+    restart: unless-stopped
+
+  attacker:
+    build: ./attacker
+    container_name: attacker
+    command: tail -f /dev/null
+    networks:
+      attacker-net:
+        ipv4_address: ${ATTACKER_IP:-10.5.1.50}
+      scada-net:
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    networks:
+      - scada-net
+    restart: unless-stopped
+
+  ml-engine:
+    build: ./ml-engine
+    container_name: ml-engine
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - scada-net
+    ports:
+      # ML scoring API: host ${ML_ENGINE_PORT} -> container 8001
+      - "${ML_ENGINE_PORT:-8001}:8001"
+    volumes:
+      - ml-models:/app/models
+      - ml-data:/app/data
+      - ml-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  monitor:
+    build: ./monitor
+    container_name: monitor
+    environment:
+      - REDIS_HOST=redis
+      - ML_ENGINE_URL=http://ml-engine:8001
+    network_mode: service:plc-01
+    depends_on:
+      - redis
+      - ml-engine
+    restart: unless-stopped
+
+  response-engine:
+    build: ./response
+    container_name: response-engine
+    environment:
+      - REDIS_HOST=redis
+      - TRAP_LOG_DIR=/app/trap-logs
+      - API_BASE_URL=http://api:3000
+      - PROFILE_INTERVAL=30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - trap-logs:/app/trap-logs
+      - soar-state:/app/soar
+      - ./profiler:/app/profiler
+      - ./attck-mapper:/app/attck_mapper
+    networks:
+      - scada-net
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: api
+    ports:
+      # Main Shadow-OT API + bundled dashboard UI: host ${API_PORT} -> container 3000
+      - "${API_PORT:-3000}:3000"
+    environment:
+      - REDIS_HOST=redis
+      - MOCK_PROFILER=${MOCK_PROFILER:-false}
+      - TRAP_LOG_DIR=/app/trap-logs
+      - PROFILES_DIR=/app/profiles
+      - PROFILER_DIR=/app/profiler
+      - DEMO_MODE=${DEMO_MODE:-false}
+      - REPORTS_DIR=/app/reports/output
+      - INTEL_BUNDLES_DIR=/app/intel/bundles
+      - INCIDENTS_PATH=/app/reports/incidents.json
+      - ENABLE_CISA_FEED=${ENABLE_CISA_FEED:-false}
+    volumes:
+      - trap-logs:/app/trap-logs
+      - profiles:/app/profiles
+      - reports-output:/app/reports/output
+      - reports-data:/app/reports
+      - intel-bundles:/app/intel/bundles
+      - ./profiler:/app/profiler
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - scada-net
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  taxii-server:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: taxii-server
+    command: ["python", "/app/intel/taxii_server.py"]
+    ports:
+      # TAXII 2.1 feed service: host ${TAXII_PORT} -> container 8002
+      - "${TAXII_PORT:-8002}:8002"
+    environment:
+      - TAXII_USER=${TAXII_USER:-shadowot}
+      - TAXII_PASS=${TAXII_PASS:-shadowot}
+      - BUNDLES_DIR=/app/intel/bundles
+    volumes:
+      - intel-bundles:/app/intel/bundles
+    networks:
+      - scada-net
+    restart: unless-stopped
+
+  # ── Phase 4 Services ───────────────────────────────────────────────────────
+  twin-sync:
+    build: ./trap-twin
+    container_name: twin-sync
+    environment:
+      - PLC_01_IP=${PLC_01_IP:-10.5.0.10}
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+      - plc-01
+    networks:
+      - scada-net
+    restart: unless-stopped
+
+  maze-router:
+    build: ./maze
+    container_name: maze-router
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - scada-net
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  breadcrumb-monitor:
+    build: ./maze/breadcrumbs
+    container_name: breadcrumb-monitor
+    volumes:
+      - trap-logs:/app/trap-logs
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - scada-net
+    restart: unless-stopped
+
+  red-team:
+    build: ./red-team
+    container_name: red-team
+    environment:
+      - TEST_PLC_IP=${PLC_01_IP:-10.5.0.10}
+      - ML_ENGINE_URL=http://ml-engine:8001
+      - REDIS_HOST=redis
+    depends_on:
+      - ml-engine
+      - redis
+    networks:
+      - scada-net
+    restart: unless-stopped
+
+  trap-builder:
+    build: ./plc-simulator
+    image: shadow-ot-trap
+    command: ["echo", "Trap image built"]
+    restart: "no"
+
+networks:
+  scada-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SCADA_NET_SUBNET:-10.5.0.0/24}
+  attacker-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${ATTACKER_NET_SUBNET:-10.5.1.0/24}
+
+volumes:
+  trap-logs:
+  profiles:
+  ml-models:
+  ml-data:
+  ml-logs:
+  reports-output:
+  reports-data:
+  intel-bundles:
+  soar-state:

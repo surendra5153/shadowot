@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow-OT HMI</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #181825 100%);
+            color: #cdd6f4;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #89b4fa;
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            text-shadow: 0 2px 10px rgba(137, 180, 250, 0.3);
+        }
+        
+        /* Attack Banner */
+        .attack-banner {
+            display: none;
+            background: linear-gradient(90deg, #f38ba8 0%, #eba0ac 100%);
+            color: #11111b;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px rgba(243, 139, 168, 0.4);
+            animation: pulse 2s infinite;
+            text-align: center;
+        }
+        
+        .attack-banner.active {
+            display: block;
+        }
+        
+        .attack-banner h2 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .attack-banner p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 20px rgba(243, 139, 168, 0.4); }
+            50% { box-shadow: 0 4px 30px rgba(243, 139, 168, 0.7); }
+        }
+        
+        /* Main Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        @media (max-width: 1024px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* PLC Table */
+        .table-container {
+            background-color: #181825;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #313244;
+        }
+        
+        th {
+            background-color: #313244;
+            color: #bac2de;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+        
+        tr {
+            transition: all 0.3s ease;
+        }
+        
+        tr:hover {
+            background-color: #1e1e2e;
+        }
+        
+        .error-row {
+            background-color: rgba(243, 139, 168, 0.2);
+        }
+        
+        .error-row td {
+            color: #f38ba8;
+            font-weight: bold;
+        }
+        
+        /* Change Highlighting */
+        .changed-row {
+            background-color: rgba(249, 226, 175, 0.15);
+            animation: highlightFade 3s ease-out;
+        }
+        
+        .changed-value {
+            position: relative;
+            color: #f9e2af;
+            font-weight: bold;
+            animation: valueChange 0.5s ease-out;
+        }
+        
+        .changed-value::before {
+            content: attr(data-old-value);
+            position: absolute;
+            right: 100%;
+            margin-right: 0.5rem;
+            color: #6c7086;
+            text-decoration: line-through;
+            white-space: nowrap;
+        }
+        
+        .changed-value::after {
+            content: "→";
+            position: absolute;
+            right: 100%;
+            margin-right: 0.25rem;
+            color: #f9e2af;
+        }
+        
+        @keyframes highlightFade {
+            0% { background-color: rgba(249, 226, 175, 0.4); }
+            100% { background-color: rgba(249, 226, 175, 0.05); }
+        }
+        
+        @keyframes valueChange {
+            0% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Timeline Widget */
+        .timeline-container {
+            background-color: #181825;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .timeline-container h3 {
+            color: #89b4fa;
+            margin-bottom: 1.5rem;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #313244;
+            padding-bottom: 0.5rem;
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, #89b4fa 0%, #313244 100%);
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            animation: slideIn 0.5s ease-out forwards;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.75rem;
+            top: 0.25rem;
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            background-color: #89b4fa;
+            box-shadow: 0 0 10px rgba(137, 180, 250, 0.6);
+        }
+        
+        .timeline-item.critical::before {
+            background-color: #f38ba8;
+            box-shadow: 0 0 10px rgba(243, 139, 168, 0.6);
+        }
+        
+        .timeline-item.success::before {
+            background-color: #a6e3a1;
+            box-shadow: 0 0 10px rgba(166, 227, 161, 0.6);
+        }
+        
+        .timeline-time {
+            font-size: 0.75rem;
+            color: #6c7086;
+            font-family: monospace;
+            margin-bottom: 0.25rem;
+        }
+        
+        .timeline-event {
+            font-size: 0.95rem;
+            color: #cdd6f4;
+            font-weight: 500;
+        }
+        
+        .timeline-details {
+            font-size: 0.85rem;
+            color: #9399b2;
+            margin-top: 0.25rem;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .empty-timeline {
+            text-align: center;
+            color: #6c7086;
+            padding: 2rem;
+            font-style: italic;
+        }
+        
+        /* Status indicator */
+        .status-indicator {
+            display: inline-block;
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+            background-color: #a6e3a1;
+            margin-right: 0.5rem;
+            animation: blink 2s infinite;
+        }
+        
+        .status-indicator.attack {
+            background-color: #f38ba8;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <span class="status-indicator" id="status-dot"></span>
+            Shadow-OT SCADA Dashboard
+        </h1>
+        
+        <!-- Attack Banner -->
+        <div class="attack-banner" id="attack-banner">
+            <h2 id="banner-title">⚠️ SECURITY ALERT</h2>
+            <p id="banner-message">Monitoring for threats...</p>
+        </div>
+        
+        <div class="grid">
+            <!-- PLC Data Table -->
+            <div class="table-container">
+                <table id="data-table">
+                    <thead>
+                        <tr>
+                            <th>PLC</th>
+                            <th>Register</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="4" style="text-align: center; padding: 2rem;">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Incident Timeline -->
+            <div class="timeline-container">
+                <h3>Incident Timeline</h3>
+                <div class="timeline" id="timeline">
+                    <div class="empty-timeline">No incidents detected</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let changedRows = new Set();
+        let timelineEvents = [];
+        
+        // Add timeline event
+        function addTimelineEvent(event, type = 'info', details = '') {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour12: false });
+            
+            timelineEvents.push({
+                time,
+                event,
+                type,
+                details,
+                timestamp: now.getTime()
+            });
+            
+            renderTimeline();
+        }
+        
+        // Render timeline
+        function renderTimeline() {
+            const timeline = document.getElementById('timeline');
+            
+            if (timelineEvents.length === 0) {
+                timeline.innerHTML = '<div class="empty-timeline">No incidents detected</div>';
+                return;
+            }
+            
+            timeline.innerHTML = timelineEvents.map((item, index) => `
+                <div class="timeline-item ${item.type}" style="animation-delay: ${index * 0.1}s">
+                    <div class="timeline-time">${item.time}</div>
+                    <div class="timeline-event">${item.event}</div>
+                    ${item.details ? `<div class="timeline-details">${item.details}</div>` : ''}
+                </div>
+            `).join('');
+        }
+        
+        // Update attack banner
+        function updateBanner(title, message, show = true) {
+            const banner = document.getElementById('attack-banner');
+            const bannerTitle = document.getElementById('banner-title');
+            const bannerMessage = document.getElementById('banner-message');
+            const statusDot = document.getElementById('status-dot');
+            
+            if (show) {
+                banner.classList.add('active');
+                statusDot.classList.add('attack');
+                bannerTitle.textContent = title;
+                bannerMessage.textContent = message;
+            } else {
+                banner.classList.remove('active');
+                statusDot.classList.remove('attack');
+            }
+        }
+        
+        // Fetch and display PLC data
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                
+                const tbody = document.querySelector('#data-table tbody');
+                tbody.innerHTML = '';
+                
+                data.forEach((item, index) => {
+                    const row = document.createElement('tr');
+                    const rowKey = `${item.plc}-${item.register}`;
+                    
+                    let isError = false;
+                    if (item.value === "N/A") {
+                        isError = true;
+                    } else if (item.normal_range) {
+                        const val = parseFloat(item.value);
+                        if (val < item.normal_range[0] || val > item.normal_range[1]) {
+                            isError = true;
+                        }
+                    }
+                    
+                    if (isError) {
+                        row.className = 'error-row';
+                    }
+                    
+                    // Highlight changed rows
+                    if (changedRows.has(rowKey)) {
+                        row.classList.add('changed-row');
+                    }
+                    
+                    row.innerHTML = `
+                        <td>${item.plc}</td>
+                        <td>${item.register}</td>
+                        <td id="value-${rowKey}">${item.value}</td>
+                        <td>${item.unit}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                // Clear changed highlighting after 3 seconds
+                setTimeout(() => {
+                    changedRows.clear();
+                }, 3000);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+        
+        // Socket.IO listeners
+        socket.on('plc_changes', (changes) => {
+            changes.forEach(change => {
+                const rowKey = `${change.plc}-${change.register}`;
+                changedRows.add(rowKey);
+                
+                // Animate value change
+                const valueCell = document.getElementById(`value-${rowKey}`);
+                if (valueCell) {
+                    valueCell.className = 'changed-value';
+                    valueCell.setAttribute('data-old-value', `${change.old_value} ${change.unit}`);
+                    
+                    setTimeout(() => {
+                        valueCell.className = '';
+                        valueCell.removeAttribute('data-old-value');
+                    }, 3000);
+                }
+                
+                // Add to timeline
+                addTimelineEvent(
+                    'PLC Value Modified',
+                    'critical',
+                    `${change.plc} ${change.register}: ${change.old_value} → ${change.new_value} ${change.unit}`
+                );
+            });
+        });
+        
+        socket.on('attack_alert', (data) => {
+            updateBanner(
+                '🔴 PLC-01 UNDER ATTACK',
+                `UNAUTHORIZED MODBUS WRITE DETECTED - Source: ${data.attacker_ip || 'Unknown'}`
+            );
+            
+            addTimelineEvent(
+                'Attack Detected',
+                'critical',
+                `Anomaly Score: ${data.anomaly_score?.toFixed(3) || 'N/A'} - ${data.trigger || 'Unknown threat'}`
+            );
+        });
+        
+        socket.on('trap_deployed', (data) => {
+            addTimelineEvent(
+                'Trap Deployed',
+                'success',
+                `Traffic redirected to ${data.trap_id || 'honeypot'}`
+            );
+        });
+        
+        socket.on('playbook_update', (data) => {
+            const stateMessages = {
+                'DEMO_LAUNCHING': { title: '⚡ ATTACK SIMULATION STARTED', msg: 'Demo attack in progress', timeline: 'Attack Simulation Started' },
+                'SCANNING_DETECTED': { title: '⚠️ SCANNING DETECTED', msg: 'Network reconnaissance activity', timeline: 'Network Scanning Detected' },
+                'THREAT_CONFIRMED': { title: '🔴 UNAUTHORIZED ACCESS', msg: 'Malicious Modbus commands detected', timeline: 'Threat Confirmed' },
+                'TRAP_DEPLOYING': { title: '⚠️ PROCESS DEVIATION DETECTED', msg: 'Abnormal PLC register modifications', timeline: 'Anomaly Threshold Exceeded' },
+                'TRAP_ACTIVE': { title: '🛡️ DECEPTION ACTIVE', msg: 'Attacker redirected to honeypot', timeline: 'Deception Trap Active' },
+                'PROFILING': { title: '🔍 BEHAVIORAL ANALYSIS', msg: 'Profiling attacker techniques', timeline: 'Attacker Profiling In Progress' },
+                'REPORT_GENERATING': { title: '📄 GENERATING REPORT', msg: 'Incident documentation in progress', timeline: 'Incident Report Generating' },
+                'CONTAINED': { title: '✅ THREAT CONTAINED', msg: 'Attack successfully mitigated', timeline: 'Threat Contained - Report Ready' },
+                'IDLE': { title: '', msg: '', timeline: '' }
+            };
+            
+            const state = data.state || 'IDLE';
+            const stateInfo = stateMessages[state] || stateMessages['IDLE'];
+            
+            if (state === 'IDLE') {
+                updateBanner('', '', false);
+                timelineEvents = [];
+                renderTimeline();
+            } else {
+                if (stateInfo.title) {
+                    updateBanner(stateInfo.title, stateInfo.msg, true);
+                }
+                if (stateInfo.timeline) {
+                    const type = state === 'CONTAINED' ? 'success' : 
+                                state.includes('TRAP') ? 'success' : 'critical';
+                    addTimelineEvent(stateInfo.timeline, type);
+                }
+            }
+        });
+        
+        // Initialize
+        fetchData();
+        setInterval(fetchData, 2000);
+    </script>
+</body>
+</html>

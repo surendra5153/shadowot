@@ -1,0 +1,68 @@
+{
+  "triton_trisis": {
+    "description": "TRITON/TRISIS — Targeting Schneider Electric Triconex safety systems. Highly automated, expert-level Modbus knowledge, low stealth (moves quickly once in).",
+    "source": "CISA ICS-CERT Advisory ICSA-18-100-03; Dragos Year in Review 2018",
+    "command_rate":     0.85,
+    "scan_coverage":    0.60,
+    "automation_score": 0.92,
+    "modbus_expertise": 0.95,
+    "write_aggression": 0.75,
+    "lateral_attempts": 0.50,
+    "stealth_index":    0.25
+  },
+  "industroyer": {
+    "description": "Industroyer/Crashoverride — Ukraine power grid attacks. Thorough register scanning, targets specific coils. Moderate automation, deliberate pace.",
+    "source": "ESET Industroyer whitepaper; Mandiant APT-SandWorm analysis",
+    "command_rate":     0.55,
+    "scan_coverage":    0.90,
+    "automation_score": 0.70,
+    "modbus_expertise": 0.88,
+    "write_aggression": 0.60,
+    "lateral_attempts": 0.65,
+    "stealth_index":    0.45
+  },
+  "pipedream": {
+    "description": "PIPEDREAM/INCONTROLLER — CISA/NSA advisory 2022. Extremely high expertise, low noise signature, slow deliberate reconnaissance before payload delivery.",
+    "source": "CISA/NSA/FBI/DOE Joint Advisory AA22-103A; Mandiant M-Trends 2022",
+    "command_rate":     0.20,
+    "scan_coverage":    0.75,
+    "automation_score": 0.80,
+    "modbus_expertise": 0.98,
+    "write_aggression": 0.40,
+    "lateral_attempts": 0.70,
+    "stealth_index":    0.90
+  },
+  "darkside_ics": {
+    "description": "DarkSide ransomware operators with ICS pivot capability. High write aggression, rapid command bursts, brute-force approach to register space.",
+    "source": "CISA Alert AA21-131A; Colonial Pipeline incident analysis",
+    "command_rate":     0.90,
+    "scan_coverage":    0.55,
+    "automation_score": 0.65,
+    "modbus_expertise": 0.45,
+    "write_aggression": 0.95,
+    "lateral_attempts": 0.80,
+    "stealth_index":    0.10
+  },
+  "sandworm": {
+    "description": "Sandworm Team (GRU Unit 74455). Balanced multi-stage campaigns; moderate all metrics, long dwell time, patient lateral movement across OT segments.",
+    "source": "US-CERT Alert TA17-293A; ESET whitepaper on BlackEnergy",
+    "command_rate":     0.45,
+    "scan_coverage":    0.60,
+    "automation_score": 0.55,
+    "modbus_expertise": 0.70,
+    "write_aggression": 0.50,
+    "lateral_attempts": 0.75,
+    "stealth_index":    0.55
+  },
+  "generic_script_kiddie": {
+    "description": "Unskilled attacker using off-the-shelf Modbus scanners (Modscan, mbtget). Low expertise, high noise, random patterns, many invalid function codes.",
+    "source": "Observed patterns in Shodan-exposed Modbus honeypots",
+    "command_rate":     0.70,
+    "scan_coverage":    0.30,
+    "automation_score": 0.40,
+    "modbus_expertise": 0.25,
+    "write_aggression": 0.30,
+    "lateral_attempts": 0.20,
+    "stealth_index":    0.15
+  }
+}

@@ -1,0 +1,62 @@
+{
+    "type": "bundle",
+    "id": "bundle--cb52e4fe-1103-456e-ab98-000e5384bf53",
+    "objects": [
+        {
+            "type": "threat-actor",
+            "spec_version": "2.1",
+            "id": "threat-actor--35d8ee22-9cff-4e8d-a36f-6d7121c4c347",
+            "created": "2026-04-24T17:23:28.455982Z",
+            "modified": "2026-04-24T17:23:28.455982Z",
+            "name": "Unknown OT Threat Actor",
+            "description": "test actor"
+        },
+        {
+            "type": "attack-pattern",
+            "spec_version": "2.1",
+            "id": "attack-pattern--26b35f6e-e896-4dcb-a34f-700a6380ce29",
+            "created": "2026-04-24T17:23:28.456451Z",
+            "modified": "2026-04-24T17:23:28.456451Z",
+            "name": "Unauthorized Command Message",
+            "description": "x",
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "external_id": "T0855"
+                }
+            ]
+        },
+        {
+            "type": "indicator",
+            "spec_version": "2.1",
+            "id": "indicator--d484ccd0-b56f-4380-b314-04bc525ef25f",
+            "created": "2026-04-24T17:23:28.455982Z",
+            "modified": "2026-04-24T17:23:28.455982Z",
+            "name": "attacker_ip",
+            "pattern": "[x-shadowot-observable:value = '10.5.1.50']",
+            "pattern_type": "stix",
+            "pattern_version": "2.1",
+            "valid_from": "2026-04-24T17:23:28.455982Z"
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--a2fd797e-e142-4685-8713-b7b94900d5b2",
+            "created": "2026-04-24T17:23:28.455982Z",
+            "modified": "2026-04-24T17:23:28.455982Z",
+            "relationship_type": "uses",
+            "source_ref": "threat-actor--35d8ee22-9cff-4e8d-a36f-6d7121c4c347",
+            "target_ref": "attack-pattern--26b35f6e-e896-4dcb-a34f-700a6380ce29"
+        },
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--b8bb991b-70e4-404c-a61b-9d1f0a769f4e",
+            "created": "2026-04-24T17:23:28.455982Z",
+            "modified": "2026-04-24T17:23:28.455982Z",
+            "relationship_type": "indicates",
+            "source_ref": "attack-pattern--26b35f6e-e896-4dcb-a34f-700a6380ce29",
+            "target_ref": "indicator--d484ccd0-b56f-4380-b314-04bc525ef25f"
+        }
+    ]
+}
